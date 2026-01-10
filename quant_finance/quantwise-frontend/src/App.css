@@ -1,0 +1,16 @@
+html, body {
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.App {
+  overflow-x: hidden;
+  width: 100%;
+}
