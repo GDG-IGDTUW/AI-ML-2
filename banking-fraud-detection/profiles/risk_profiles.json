@@ -1,0 +1,26 @@
+{
+  "Default": {
+    "ae_threshold": 0.025,
+    "hybrid_threshold": 0.55,
+    "fraud_threshold": 0.80,
+    "rule_weight": 0.3,
+    "if_midpoint": 0.0,
+    "if_steepness": 8.0
+  },
+  "Conservative": {
+    "ae_threshold": 0.03,
+    "hybrid_threshold": 0.45,
+    "fraud_threshold": 0.75,
+    "rule_weight": 0.35,
+    "if_midpoint": 0.0,
+    "if_steepness": 10.0
+  },
+  "Aggressive": {
+    "ae_threshold": 0.020,
+    "hybrid_threshold": 0.65,
+    "fraud_threshold": 0.90,
+    "rule_weight": 0.25,
+    "if_midpoint": 0.0,
+    "if_steepness": 6.0
+  }
+}
