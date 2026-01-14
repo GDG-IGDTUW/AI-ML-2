@@ -1,0 +1,10 @@
+flask
+flask-cors
+requests
+numpy
+pandas
+python-dotenv
+prophet
+statsmodels
+scikit-learn
+tensorflow

@@ -1,30 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Trash2, TrendingUp, Shield, PieChart, BarChart3, AlertCircle, RefreshCw, Activity, Zap } from 'lucide-react';
-import { PieChart as RechartsPie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import React, { useState } from 'react';
+import { PlusCircle, Trash2, TrendingUp, PieChart as PieIcon, AlertCircle } from 'lucide-react';
+import { PieChart as RechartsPie, Cell, ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+
+const API_BASE = 'http://localhost:5001';
+
+const DEFAULT_HOLDINGS = [
+  { symbol: 'AAPL', allocation: '25' },
+  { symbol: 'MSFT', allocation: '25' },
+  { symbol: 'GOOG', allocation: '25' },
+  { symbol: 'TSLA', allocation: '25' },
+];
 
 const PortfolioAnalyzer = () => {
-  const [holdings, setHoldings] = useState([
-    { symbol: '', allocation: '' }
-  ]);
+  const [holdings, setHoldings] = useState(DEFAULT_HOLDINGS);
   const [analysis, setAnalysis] = useState(null);
-  const [realTimeData, setRealTimeData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isRealTimeActive, setIsRealTimeActive] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [priceHistory, setPriceHistory] = useState({});
-  const [alerts, setAlerts] = useState([]);
-
-  // Real-time data polling
-  useEffect(() => {
-    let interval;
-    if (isRealTimeActive && analysis) {
-      interval = setInterval(() => {
-        fetchRealTimeData();
-      }, 5000); // Update every 5 seconds
-    }
-    return () => clearInterval(interval);
-  }, [isRealTimeActive, analysis]);
 
   const addHolding = () => {
     setHoldings([...holdings, { symbol: '', allocation: '' }]);
@@ -37,20 +28,23 @@ const PortfolioAnalyzer = () => {
   };
 
   const updateHolding = (index, field, value) => {
-    const updated = holdings.map((holding, i) => 
+    const updated = holdings.map((holding, i) =>
       i === index ? { ...holding, [field]: value } : holding
     );
     setHoldings(updated);
   };
 
   const validatePortfolio = () => {
-    const validHoldings = holdings.filter(h => h.symbol && h.allocation);
+    const validHoldings = holdings.filter((h) => h.symbol && h.allocation);
     if (validHoldings.length === 0) {
-      setError('Please add at least one stock with allocation');
+      setError('Please add at least one stock with allocation.');
       return false;
     }
 
-    const totalAllocation = validHoldings.reduce((sum, h) => sum + parseFloat(h.allocation || 0), 0);
+    const totalAllocation = validHoldings.reduce(
+      (sum, h) => sum + parseFloat(h.allocation || 0),
+      0
+    );
     if (Math.abs(totalAllocation - 100) > 0.01) {
       setError(`Total allocation must equal 100%. Current total: ${totalAllocation.toFixed(2)}%`);
       return false;
@@ -60,105 +54,6 @@ const PortfolioAnalyzer = () => {
     return true;
   };
 
-  const fetchRealTimeData = async () => {
-    if (!analysis) return;
-
-    try {
-      const validHoldings = holdings.filter(h => h.symbol && h.allocation);
-      const symbols = validHoldings.map(h => h.symbol.toUpperCase());
-      
-      const response = await fetch('http://localhost:5000/api/realtime', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbols })
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch real-time data');
-      
-      const data = await response.json();
-      setRealTimeData(data.prices);
-      setLastUpdate(new Date());
-      
-      // Update price history for charts
-      setPriceHistory(prev => {
-        const updated = { ...prev };
-        Object.keys(data.prices).forEach(symbol => {
-          if (!updated[symbol]) updated[symbol] = [];
-          updated[symbol].push({
-            time: new Date().toLocaleTimeString(),
-            price: data.prices[symbol].price,
-            change: data.prices[symbol].change_percent
-          });
-          // Keep only last 20 data points
-          if (updated[symbol].length > 20) {
-            updated[symbol] = updated[symbol].slice(-20);
-          }
-        });
-        return updated;
-      });
-      
-      // Check for alerts
-      checkForAlerts(data.prices);
-      
-      // Recalculate portfolio metrics with new prices
-      await updatePortfolioMetrics(data.prices);
-      
-    } catch (err) {
-      console.error('Real-time data fetch error:', err);
-    }
-  };
-
-  const checkForAlerts = (prices) => {
-    const newAlerts = [];
-    const alertThreshold = 2; // 2% change threshold
-    
-    Object.entries(prices).forEach(([symbol, data]) => {
-      const changePercent = Math.abs(data.change_percent);
-      if (changePercent > alertThreshold) {
-        newAlerts.push({
-          id: Date.now() + Math.random(),
-          symbol,
-          type: data.change_percent > 0 ? 'gain' : 'loss',
-          change: data.change_percent,
-          timestamp: new Date()
-        });
-      }
-    });
-    
-    if (newAlerts.length > 0) {
-      setAlerts(prev => [...newAlerts, ...prev].slice(0, 10)); // Keep last 10 alerts
-    }
-  };
-
-  const updatePortfolioMetrics = async (prices) => {
-    try {
-      const validHoldings = holdings.filter(h => h.symbol && h.allocation);
-      const portfolio = validHoldings.map(h => ({
-        symbol: h.symbol.toUpperCase(),
-        allocation: parseFloat(h.allocation)
-      }));
-
-      const response = await fetch('http://localhost:5000/api/analyze-realtime', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolio, current_prices: prices })
-      });
-      
-      if (!response.ok) throw new Error('Failed to update portfolio metrics');
-      
-      const data = await response.json();
-      setAnalysis(prev => ({
-        ...prev,
-        ...data,
-        real_time_value: data.portfolio_value,
-        real_time_change: data.portfolio_change
-      }));
-      
-    } catch (err) {
-      console.error('Portfolio metrics update error:', err);
-    }
-  };
-
   const analyzePortfolio = async () => {
     if (!validatePortfolio()) return;
 
@@ -166,361 +61,262 @@ const PortfolioAnalyzer = () => {
     setError('');
 
     try {
-      const validHoldings = holdings.filter(h => h.symbol && h.allocation);
-      const portfolio = validHoldings.map(h => ({
+      const validHoldings = holdings.filter((h) => h.symbol && h.allocation);
+      const portfolio = validHoldings.map((h) => ({
         symbol: h.symbol.toUpperCase(),
-        allocation: parseFloat(h.allocation)
+        allocation: parseFloat(h.allocation),
       }));
 
-      const response = await fetch('http://localhost:5000/api/analyze', {
+      const response = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.JSON.stringify({ portfolio })
+        body: JSON.stringify({ portfolio }),
       });
-      
-      if (!response.ok) throw new Error('Failed to analyze portfolio');
-      
+
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze portfolio');
+      }
+
       setAnalysis(data);
-      
-      // Initialize price history
-      const initialHistory = {};
-      portfolio.forEach(stock => {
-        initialHistory[stock.symbol] = [];
-      });
-      setPriceHistory(initialHistory);
-      
     } catch (err) {
-      setError('Failed to analyze portfolio. Please try again.');
       console.error('Analysis error:', err);
+      setError(err.message || 'Failed to analyze portfolio. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleRealTime = () => {
-    setIsRealTimeActive(!isRealTimeActive);
-    if (!isRealTimeActive) {
-      fetchRealTimeData(); // Fetch immediately when enabled
-    }
-  };
+  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00c9a7', '#ff6f61'];
+  const totalAllocation = holdings.reduce(
+    (sum, h) => sum + parseFloat(h.allocation || 0),
+    0
+  );
 
-  const dismissAlert = (alertId) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== alertId));
-  };
-
-  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff00ff', '#00ffff', '#ff0000'];
-  const totalAllocation = holdings.reduce((sum, h) => sum + parseFloat(h.allocation || 0), 0);
+  const allocationData = holdings
+    .filter((h) => h.symbol && h.allocation)
+    .map((h) => ({
+      symbol: h.symbol.toUpperCase(),
+      allocation: parseFloat(h.allocation),
+    }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-800 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="bg-white/90 backdrop-blur-lg rounded-3xl shadow-2xl p-8">
-          {/* Header with Real-time Status */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">
-              Real-Time Portfolio Analyzer
-              {isRealTimeActive && (
-                <Zap className="inline ml-2 text-yellow-500 animate-pulse" size={32} />
-              )}
-            </h1>
-            <p className="text-gray-600">Live portfolio analysis with real-time data and recommendations</p>
-            {lastUpdate && (
-              <p className="text-sm text-green-600 mt-2">
-                Last updated: {lastUpdate.toLocaleTimeString()}
-              </p>
-            )}
+    <section className="relative py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+      <div className="absolute inset-0 pointer-events-none opacity-40">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_55%),_radial-gradient(circle_at_bottom,_rgba(129,140,248,0.16),_transparent_55%)]" />
+      </div>
+
+      <div className="relative max-w-5xl mx-auto space-y-10">
+        <header className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-slate-900/60 px-4 py-1 text-xs font-medium text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.25)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse" />
+            QuantWise · AI-powered portfolio snapshot
           </div>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-50 flex items-center justify-center gap-3">
+            <TrendingUp className="h-7 w-7 text-cyan-300" />
+            Portfolio Analyzer
+          </h2>
+          <p className="max-w-2xl mx-auto text-sm sm:text-base text-slate-300">
+            Start with a ready‑made sample portfolio, tweak the allocations, and instantly see
+            estimated risk & return based on recent price movements.
+          </p>
+        </header>
 
-          {/* Real-time Alerts */}
-          {alerts.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                <Activity className="mr-2 text-red-500" />
-                Live Alerts
-              </h3>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {alerts.slice(0, 3).map(alert => (
-                  <div
-                    key={alert.id}
-                    className={`p-3 rounded-lg flex justify-between items-center ${
-                      alert.type === 'gain' ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300'
-                    } border`}
-                  >
-                    <span className={`font-semibold ${alert.type === 'gain' ? 'text-green-700' : 'text-red-700'}`}>
-                      {alert.symbol}: {alert.change > 0 ? '+' : ''}{alert.change.toFixed(2)}%
-                    </span>
-                    <button
-                      onClick={() => dismissAlert(alert.id)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+          {/* Left: Inputs */}
+          <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 shadow-[0_18px_60px_rgba(15,23,42,0.8)] backdrop-blur-md p-5 sm:p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                  <PieIcon className="h-4 w-4 text-cyan-300" />
+                  Holdings
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Use 3–6 large cap stocks for the cleanest demo.
+                </p>
               </div>
-            </div>
-          )}
-
-          {/* Portfolio Input Section */}
-          <div className="bg-gray-50 rounded-2xl p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold text-gray-800 flex items-center">
-                <PieChart className="mr-2" />
-                Portfolio Holdings
-              </h2>
-              {analysis && (
-                <button
-                  onClick={toggleRealTime}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
-                    isRealTimeActive 
-                      ? 'bg-green-500 text-white hover:bg-green-600' 
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
+              <div className="text-right text-xs text-slate-300">
+                <span className="text-slate-400">Total allocation</span>
+                <p
+                  className={`font-semibold ${
+                    Math.abs(totalAllocation - 100) < 0.01 ? 'text-emerald-300' : 'text-amber-300'
                   }`}
                 >
-                  {isRealTimeActive ? (
-                    <>
-                      <Activity className="animate-pulse" size={20} />
-                      Live Data ON
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw size={20} />
-                      Enable Real-Time
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-            
-            {holdings.map((holding, index) => (
-              <div key={index} className="flex gap-4 mb-4 items-center">
-                <input
-                  type="text"
-                  placeholder="Stock Symbol (e.g., AAPL)"
-                  value={holding.symbol}
-                  onChange={(e) => updateHolding(index, 'symbol', e.target.value.toUpperCase())}
-                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
-                />
-                <div className="relative">
-                  <input
-                    type="number"
-                    placeholder="Allocation %"
-                    value={holding.allocation}
-                    onChange={(e) => updateHolding(index, 'allocation', e.target.value)}
-                    className="w-32 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                  />
-                  <span className="absolute right-3 top-3 text-gray-500">%</span>
-                </div>
-                {/* Real-time price display */}
-                {realTimeData[holding.symbol] && (
-                  <div className="text-sm">
-                    <div className="font-semibold">${realTimeData[holding.symbol].price?.toFixed(2)}</div>
-                    <div className={`${realTimeData[holding.symbol].change_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {realTimeData[holding.symbol].change_percent >= 0 ? '+' : ''}
-                      {realTimeData[holding.symbol].change_percent?.toFixed(2)}%
-                    </div>
-                  </div>
-                )}
-                <button
-                  onClick={() => removeHolding(index)}
-                  disabled={holdings.length === 1}
-                  className="p-3 text-red-500 hover:bg-red-50 rounded-lg disabled:text-gray-300 disabled:hover:bg-transparent transition-colors"
-                >
-                  <Trash2 size={20} />
-                </button>
+                  {totalAllocation.toFixed(1)}%
+                </p>
               </div>
-            ))}
+            </div>
 
-            <div className="flex justify-between items-center mt-6">
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+              {holdings.map((holding, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center rounded-xl border border-slate-700/70 bg-slate-900/80 px-3 py-3"
+                >
+                  <input
+                    type="text"
+                    placeholder="Symbol (e.g., AAPL)"
+                    value={holding.symbol}
+                    onChange={(e) =>
+                      updateHolding(index, 'symbol', e.target.value.toUpperCase())
+                    }
+                    className="w-full sm:flex-1 rounded-lg bg-slate-900/80 px-3 py-2.5 text-sm text-slate-50 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none placeholder:text-slate-500 transition"
+                  />
+                  <div className="relative w-full sm:w-32">
+                    <input
+                      type="number"
+                      placeholder="Alloc %"
+                      value={holding.allocation}
+                      onChange={(e) => updateHolding(index, 'allocation', e.target.value)}
+                      className="w-full rounded-lg bg-slate-900/80 px-3 py-2.5 text-sm text-slate-50 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 outline-none placeholder:text-slate-500 transition"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-2.5 text-xs text-slate-500">
+                      %
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeHolding(index)}
+                    disabled={holdings.length === 1}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-700 bg-slate-900/80 px-2.5 py-2 text-xs font-medium text-slate-300 hover:border-rose-500 hover:text-rose-300 hover:bg-slate-900 disabled:opacity-40 disabled:hover:border-slate-700 disabled:hover:text-slate-300 transition"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2">
               <button
                 onClick={addHolding}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-500/60 bg-slate-900/80 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-cyan-100 hover:bg-slate-900 hover:border-cyan-400 hover:text-cyan-50 transition shadow-[0_0_25px_rgba(34,211,238,0.25)]"
               >
-                <PlusCircle size={20} />
-                Add Stock
+                <PlusCircle className="h-4 w-4" />
+                Add stock
               </button>
-              
-              <div className="text-right">
-                <p className={`text-lg font-semibold ${Math.abs(totalAllocation - 100) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                  Total: {totalAllocation.toFixed(1)}%
-                </p>
-                {analysis?.real_time_value && (
-                  <p className="text-sm text-gray-600">
-                    Portfolio Value: ${analysis.real_time_value.toLocaleString()}
-                  </p>
-                )}
-                {analysis?.real_time_change && (
-                  <p className={`text-sm font-semibold ${analysis.real_time_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    Today: {analysis.real_time_change >= 0 ? '+' : ''}{analysis.real_time_change.toFixed(2)}%
-                  </p>
-                )}
-              </div>
+
+              <button
+                onClick={analyzePortfolio}
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 px-6 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-cyan-500/35 hover:shadow-cyan-400/45 hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400 disabled:opacity-60 disabled:cursor-not-allowed transition-transform hover:-translate-y-0.5"
+              >
+                {loading ? 'Crunching numbers…' : 'Run analysis'}
+              </button>
             </div>
 
             {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg flex items-center">
-                <AlertCircle className="text-red-500 mr-2" size={20} />
-                <span className="text-red-700">{error}</span>
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-500/50 bg-rose-950/60 px-3 py-2.5 text-xs text-rose-100">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
+                <span>{error}</span>
               </div>
             )}
-
-            <button
-              onClick={analyzePortfolio}
-              disabled={loading}
-              className="w-full mt-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 transition-all transform hover:scale-105"
-            >
-              {loading ? 'Analyzing Portfolio...' : 'Analyze Portfolio'}
-            </button>
           </div>
 
-          {/* Real-time Price Charts */}
-          {Object.keys(priceHistory).length > 0 && Object.values(priceHistory).some(history => history.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {Object.entries(priceHistory).map(([symbol, history]) => 
-                history.length > 0 && (
-                  <div key={symbol} className="bg-white rounded-2xl p-6 shadow-lg">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                      <TrendingUp className="mr-2 text-blue-600" />
-                      {symbol} - Live Price
-                    </h3>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={history}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="time" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="price" stroke="#8884d8" strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )
-              )}
-            </div>
-          )}
+          {/* Right: Output */}
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 shadow-[0_18px_60px_rgba(15,23,42,0.8)] backdrop-blur-md p-5 sm:p-6">
+              <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-300" />
+                Portfolio snapshot
+              </h3>
 
-          {/* Analysis Results */}
-          {analysis && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Portfolio Metrics */}
-              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  <TrendingUp className="mr-2 text-green-600" />
-                  Portfolio Metrics
-                  {isRealTimeActive && <Activity className="ml-2 text-green-500 animate-pulse" size={16} />}
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Expected Annual Return</span>
-                    <span className="font-semibold text-green-600">
+              {analysis ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+                  <div className="rounded-xl bg-slate-900/80 border border-emerald-500/40 px-3 py-3 flex flex-col gap-1">
+                    <span className="text-slate-400">Expected annual return</span>
+                    <span className="text-emerald-300 text-lg font-semibold">
                       {(analysis.portfolio_metrics.expected_return * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Volatility (Risk)</span>
-                    <span className="font-semibold text-orange-600">
+                  <div className="rounded-xl bg-slate-900/80 border border-amber-500/40 px-3 py-3 flex flex-col gap-1">
+                    <span className="text-slate-400">Volatility (risk)</span>
+                    <span className="text-amber-300 text-lg font-semibold">
                       {(analysis.portfolio_metrics.volatility * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Sharpe Ratio</span>
-                    <span className="font-semibold text-blue-600">
+                  <div className="rounded-xl bg-slate-900/80 border border-sky-500/40 px-3 py-3 flex flex-col gap-1">
+                    <span className="text-slate-400">Sharpe ratio</span>
+                    <span className="text-sky-300 text-lg font-semibold">
                       {analysis.portfolio_metrics.sharpe_ratio.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Beta</span>
-                    <span className="font-semibold text-purple-600">
-                      {analysis.portfolio_metrics.beta.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Value at Risk (95%)</span>
-                    <span className="font-semibold text-red-600">
-                      {(analysis.portfolio_metrics.var_95 * 100).toFixed(2)}%
-                    </span>
-                  </div>
                 </div>
+              ) : (
+                <p className="text-xs sm:text-sm text-slate-400">
+                  Add or adjust your holdings on the left, then click{' '}
+                  <span className="font-semibold text-slate-200">Run analysis</span> to see a quick
+                  risk–return view of the portfolio.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 shadow-[0_18px_60px_rgba(15,23,42,0.8)] backdrop-blur-md p-5 sm:p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                  <PieIcon className="h-4 w-4 text-cyan-300" />
+                  Allocation & equity curve
+                </h3>
               </div>
 
-              {/* Real-time Recommendations */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  <Shield className="mr-2 text-purple-600" />
-                  Live Recommendations
-                  {isRealTimeActive && <Zap className="ml-2 text-yellow-500 animate-pulse" size={16} />}
-                </h3>
-                <div className="space-y-4">
-                  <div className="p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Risk Level: </span>
-                    <span className="font-semibold text-orange-600">{analysis.risk_analysis.risk_level}</span>
+              <div className="grid grid-cols-1 gap-6">
+                {allocationData.length > 0 && (
+                  <div className="h-48 sm:h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie
+                        data={allocationData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="allocation"
+                        label={({ symbol, allocation }) => `${symbol}: ${allocation}%`}
+                      >
+                        {allocationData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </RechartsPie>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="p-3 bg-white rounded-lg">
-                    <span className="text-gray-700">Concentration Risk: </span>
-                    <span className="font-semibold text-purple-600">{analysis.diversification.concentration_risk}</span>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-700">Live Recommendations:</h4>
-                    <ul className="space-y-1">
-                      {analysis.risk_analysis.recommendations.map((rec, i) => (
-                        <li key={i} className="text-sm text-gray-600 bg-white p-2 rounded flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          {rec}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+                )}
 
-              {/* Sector Allocation Chart */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  <PieChart className="mr-2 text-blue-600" />
-                  Sector Allocation
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RechartsPie
-                    data={analysis.diversification.sector_allocation}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="allocation"
-                    label={({ sector, allocation }) => `${sector}: ${allocation}%`}
-                  >
-                    {analysis.diversification.sector_allocation.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </RechartsPie>
-                  <Tooltip />
-                </ResponsiveContainer>
-              </div>
-
-              {/* Holdings Chart */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                  <BarChart3 className="mr-2 text-green-600" />
-                  Holdings Breakdown
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analysis.diversification.sector_allocation}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="symbol" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="allocation" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {analysis?.history && analysis.history.length > 0 && (
+                  <div className="h-48 sm:h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analysis.history}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="date" hide />
+                        <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#020617',
+                            borderRadius: 8,
+                            border: '1px solid rgba(148, 163, 184, 0.6)',
+                            fontSize: 11,
+                          }}
+                          labelStyle={{ color: '#e5e7eb' }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#38bdf8"
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 3, fill: '#e0f2fe', strokeWidth: 0 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
