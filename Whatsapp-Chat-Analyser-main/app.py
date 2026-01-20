@@ -121,4 +121,19 @@ if uploaded_file is not None:
             ax.pie(top_emoji[1], labels=top_emoji[0], autopct="%0.2f")
             st.pyplot(fig)
 
+        # Toxic / Profanity Analysis
+        st.title("Toxic words / Profanity Analysis")
+        toxic_user_df, toxic_words_df = helper.toxic_analysis(selected_user, df)
+
+        st.caption(
+        "⚠️ Disclaimer: This analysis is keyword-based using a small custom list. "
+         "It does not understand context and may produce false positives."
+        )
+
+        st.subheader("Toxic Word Count per User")
+        st.dataframe(toxic_user_df)
+
+        st.subheader("Most Common Flagged Words")
+        st.dataframe(toxic_words_df)
+
 

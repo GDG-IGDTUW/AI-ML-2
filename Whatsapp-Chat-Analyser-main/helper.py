@@ -3,6 +3,7 @@ from wordcloud import WordCloud
 import pandas as pd
 from collections import Counter
 from emoji import EMOJI_DATA
+import string
 
 def fetch_stats(selected_user,df):
     if selected_user!="Overall":
@@ -103,3 +104,46 @@ def activity_heatmap(selected_user,df):
         df=df[df['user']==selected_user]
     user_heatmap = df.pivot_table(index='day_name', columns='period', values='message', aggfunc='count').fillna(0)
     return user_heatmap
+
+def load_bad_words():
+    with open('bad_words.txt', 'r', encoding='utf-8') as f:
+        return set(word.strip() for word in f if word.strip())
+
+def toxic_analysis(selected_user, df):
+    if selected_user != "Overall":
+        df = df[df['user'] == selected_user]
+
+    df = df[df['user'] != 'group_notification']
+    df = df[df['message'] != '<Media omitted>']
+
+    bad_words = load_bad_words()
+
+    toxic_words = []
+    toxic_count_per_user = {}
+
+    for _, row in df.iterrows():
+        user = row['user']
+        # remove punctuation
+        message = row['message'].lower()
+        message = message.translate(str.maketrans('', '', string.punctuation))
+        words = message.split()
+
+        count = 0
+        for w in words:
+            if w in bad_words:
+                count += 1
+                toxic_words.append(w)
+
+        toxic_count_per_user[user] = toxic_count_per_user.get(user, 0) + count
+
+    toxic_user_df = pd.DataFrame(
+        toxic_count_per_user.items(),
+        columns=['User', 'Toxic Word Count']
+    ).sort_values(by='Toxic Word Count', ascending=False)
+
+    toxic_words_df = pd.DataFrame(
+        Counter(toxic_words).most_common(10),
+        columns=['Word', 'Count']
+    )
+
+    return toxic_user_df, toxic_words_df
