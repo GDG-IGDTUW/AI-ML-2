@@ -1,0 +1,10 @@
+streamlit
+pandas
+torch
+transformers
+matplotlib
+seaborn
+numpy
+fpdf
+whois
+requests
