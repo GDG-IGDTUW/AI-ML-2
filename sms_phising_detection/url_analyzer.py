@@ -1,36 +1,28 @@
 import re
-import whois
 from urllib.parse import urlparse
 
-class URLForensics:
-    def __init__(self):
-        self.suspicious_tlds = ['.zip', '.support', '.xyz', '.click', '.top']
+def extract_urls(text):
+    """Finds links in the SMS."""
+    return re.findall(r'(https?://[^\s]+)', text)
 
-    def extract_urls(self, text):
-        return re.findall(r'(https?://[^\s]+)', text)
+def predict_url_risk(url):
+    """
+    Solves Issue #47: Predicts if a URL is risky 
+    based on length, keywords, and structure.
+    """
+    risk_score = 0
+    # 1. Check for suspicious keywords (Phishing Lures)
+    keywords = ['login', 'verify', 'bank', 'bit.ly', 'secure', 'update', 'otp']
+    for word in keywords:
+        if word in url.lower():
+            risk_score += 30
 
-    def get_domain_age(self, url):
-        """Forensic check: New domains are often used for phishing."""
-        try:
-            domain = urlparse(url).netloc
-            w = whois.whois(domain)
-            return w.creation_date
-        except:
-            return "Unknown"
+    # 2. Check for abnormal length
+    if len(url) > 50:
+        risk_score += 20
 
-    def calculate_risk(self, url):
-        score = 0
-        parsed = urlparse(url)
-        
-        # 1. Lexical Check (Issue #47 Core)
-        if len(url) > 60: score += 20
-        if parsed.netloc.count('.') > 3: score += 15
-        
-        # 2. Sensitive Keyword Check
-        if any(keyword in url.lower() for keyword in ['login', 'verify', 'bank', 'otp']):
-            score += 30
-            
-        # 3. Protocol Check
-        if parsed.scheme == 'http': score += 10 # Unencrypted is riskier
+    # 3. Check for IP-based URLs (Common in phishing)
+    if re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', url):
+        risk_score += 50
 
-        return min(score, 100)
+    return min(risk_score, 100)
