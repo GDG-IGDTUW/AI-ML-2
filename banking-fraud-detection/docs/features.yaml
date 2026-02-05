@@ -1,0 +1,181 @@
+# docs/features.yaml
+# BAIDS Feature Metadata
+# Auto-generated from hybrid_predictor, frontend, and API
+
+# ----------------- Login Event Features (raw input) -----------------
+email:
+  source: login_event dict
+  type: string
+  description: "Email of the user attempting login"
+  example: "user123@example.com"
+
+ip:
+  source: login_event dict
+  type: string
+  description: "IP address of the login attempt"
+  example: "192.168.1.23"
+
+location:
+  source: login_event dict
+  type: string
+  description: "Geographical location of the login attempt"
+  example: "Delhi, IN"
+
+device_id:
+  source: login_event dict
+  type: string
+  description: "Device ID reported in the login attempt"
+  example: "DEVICE123"
+
+imei:
+  source: login_event dict
+  type: string
+  description: "Device IMEI for mobile devices"
+  example: "123456789012345"
+
+timestamp:
+  source: login_event dict
+  type: float
+  description: "Unix timestamp of the login attempt"
+  example: 1670000000.0
+
+profile:
+  source: login_event dict / API hint
+  type: string
+  description: "Optional profile name for scoring"
+  example: "Default"
+
+# ----------------- Extracted Features -----------------
+geo_mismatch:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "Indicates if the login's country does not match user's home/SIM country"
+  range: [true, false]
+
+device_mismatch:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "Login device does not match historical device for this account"
+  range: [true, false]
+
+device_imei_mismatch:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "Login IMEI does not match historical device IMEIs"
+  range: [true, false]
+
+new_device:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "First-time login from a new/unknown device"
+  range: [true, false]
+
+vpn:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "VPN or proxy detected for the IP"
+  range: [true, false]
+
+vpn_detected:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "Alias for VPN detection"
+  range: [true, false]
+
+odd_hour:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: bool
+  description: "Login occurred at unusual hour for this user"
+  range: [true, false]
+
+ip_risk_score:
+  source: utils.feature_extractor_login.extract_features_from_login
+  type: float
+  description: "IP reputation / blacklist score"
+  range: [0, 100]
+
+# ----------------- Numeric / ML Features -----------------
+numeric_vec:
+  source: hybrid_predictor._build_numeric_vector
+  type: list of floats
+  description: "Numeric vector representation of features for ML models"
+  example: [0.0, 1.0, 0.0]
+
+if_score_raw:
+  source: IsolationForest decision_function
+  type: float
+  description: "Raw output of IsolationForest before mapping to anomaly score"
+  range: [-1.0, 1.0]  # approximate
+
+if_anomaly_score:
+  source: hybrid_predictor._if_raw_to_anomaly_score
+  type: float
+  description: "IsolationForest anomaly score mapped to [0,1]"
+  range: [0.0, 1.0]
+
+ae_loss:
+  source: Autoencoder reconstruction error
+  type: float
+  description: "Mean squared error from Autoencoder reconstruction"
+  range: [0.0, inf]
+
+ae_score:
+  source: hybrid_predictor._ae_loss_to_score
+  type: float
+  description: "Autoencoder anomaly score normalized to [0,1]"
+  range: [0.0, 1.0]
+
+rule_score:
+  source: utils.rules.compute_rule_risk_score
+  type: float
+  description: "Weighted risk score from rule engine (0..100)"
+  range: [0, 100]
+
+rule_score_norm:
+  source: hybrid_predictor.hybrid_predict
+  type: float
+  description: "Normalized rule score in [0,1]"
+  range: [0.0, 1.0]
+
+anomaly_score:
+  source: hybrid_predictor.hybrid_predict
+  type: float
+  description: "Weighted combination of IF and AE scores"
+  range: [0.0, 1.0]
+
+final_risk_score:
+  source: hybrid_predictor.hybrid_predict
+  type: float
+  description: "Final weighted risk score (0..100%) combining ML and rules"
+  range: [0.0, 100.0]
+
+verdict:
+  source: hybrid_predictor.hybrid_predict / frontend normalization
+  type: string
+  description: "Decision label for the login: 'legit', 'suspicious', or 'fraud'"
+  possible_values: ["legit", "suspicious", "fraud"]
+
+profile_used:
+  source: hybrid_predictor.hybrid_predict
+  type: string
+  description: "Profile name applied to compute scores"
+  example: "Default"
+
+explanations:
+  source: hybrid_predictor._build_explanations / rule engine
+  type: list of strings
+  description: "Human-readable reasons contributing to the risk score"
+
+flags:
+  source: hybrid_predictor.hybrid_predict
+  type: dict
+  description: "Boolean flags indicating if score thresholds are exceeded"
+  keys:
+    ae_flag: "ae_loss > ae_threshold"
+    if_flag: "if_anomaly_score >= 0.6"
+    rule_flag: "rule_score_norm >= hybrid_threshold"
+
+ts:
+  source: API / login_event
+  type: string
+  description: "UTC timestamp when the event was logged"
