@@ -8,3 +8,4 @@ numpy
 fpdf
 whois
 requests
+urllib3
