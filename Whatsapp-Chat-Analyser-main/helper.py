@@ -147,3 +147,45 @@ def toxic_analysis(selected_user, df):
     )
 
     return toxic_user_df, toxic_words_df
+
+def reply_time_analysis(selected_user, df, gap_threshold_hours=6):
+
+    # Filter user if not Overall
+    if selected_user != "Overall":
+        df = df[df['user'] == selected_user]
+
+    # Remove group notifications
+    df = df[df['user'] != 'group_notification'].copy()
+
+    # Sort by date
+    df = df.sort_values('date')
+
+    # Shift previous values
+    df['prev_user'] = df['user'].shift(1)
+    df['prev_date'] = df['date'].shift(1)
+
+    # Keep only rows where sender changed
+    df = df[df['user'] != df['prev_user']]
+
+    # Calculate reply time in minutes
+    df['reply_time'] = (
+        (df['date'] - df['prev_date']).dt.total_seconds() / 60
+    )
+
+    # Remove negative / NaN values
+    df = df[df['reply_time'] > 0]
+
+    # Exclude long gaps
+    df = df[df['reply_time'] <= gap_threshold_hours * 60]
+
+    # Calculate median reply time per user
+    result = (
+        df.groupby('user')['reply_time']
+        .median()
+        .reset_index()
+        .sort_values('reply_time')
+    )
+
+    result.rename(columns={'reply_time': 'Median Reply Time (minutes)'}, inplace=True)
+
+    return result

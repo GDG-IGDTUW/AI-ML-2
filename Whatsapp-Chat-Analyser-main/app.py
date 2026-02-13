@@ -136,4 +136,29 @@ if uploaded_file is not None:
         st.subheader("Most Common Flagged Words")
         st.dataframe(toxic_words_df)
 
+        # Response time Analysis
+        st.title("Response Time Analysis (Who Replies Faster)")
 
+        gap_threshold = st.slider(
+            "Exclude gaps longer than (hours)",
+            min_value=1,
+            max_value=24,
+            value=6
+        )
+
+        reply_df = helper.reply_time_analysis(selected_user, df, gap_threshold)
+
+        st.subheader("Median Reply Time per User (in minutes)")
+        st.dataframe(reply_df)
+
+        # Optional Bar Chart
+        if not reply_df.empty:
+            fig, ax = plt.subplots()
+            ax.bar(
+                reply_df['user'],
+                reply_df['Median Reply Time (minutes)']
+            )
+            plt.xticks(rotation=45)
+            ax.set_ylabel("Minutes")
+            ax.set_title("Median Reply Time")
+            st.pyplot(fig)
