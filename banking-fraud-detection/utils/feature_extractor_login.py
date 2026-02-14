@@ -5,6 +5,19 @@
 # ==========================================
 
 import math
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("feature_extractor")
+
+def validate_and_log_missing(event: dict) -> dict:
+    """Log missing critical fields and return validation report"""
+    critical_fields = ["imei", "ip_address", "device_id"]
+    missing = [f for f in critical_fields if not event.get(f)]
+    
+    if missing:
+        logger.warning(f"Missing critical fields: {missing}")
+    
+    return {"missing_fields": missing, "is_valid": len(missing) == 0}
 
 def canonicalize_event(event: dict) -> dict:
     """
@@ -71,7 +84,7 @@ def extract_features_from_login(login_event: dict) -> dict:
     Extracts engineered features for anomaly/fraud detection.
     Safe defaults ensure missing keys don't break flow.
     """
-
+    validation = validate_and_log_missing(login_event) 
     e = canonicalize_event(login_event)
 
     # Device & SIM fingerprint
