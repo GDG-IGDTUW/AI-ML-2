@@ -1,0 +1,13 @@
+# config.yaml
+thresholds:
+  ae_threshold: 0.025
+  hybrid_threshold: 0.55
+  fraud_threshold: 0.80
+  rule_weight: 0.3
+  if_midpoint: 0.0
+  if_steepness: 8.0
+
+features:
+  odd_hour_range: [0, 1, 2, 3, 4]
+  high_risk_ip_score: 70
+  if_anomaly_threshold: 0.6
