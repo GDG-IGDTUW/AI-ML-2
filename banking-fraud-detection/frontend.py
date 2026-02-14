@@ -78,7 +78,6 @@ if not df.empty:
 # ------------------------------
 st.sidebar.title("⚙️ Controls")
 
-uploaded = st.sidebar.file_uploader("Upload a log file (.jsonl)", type=["jsonl"])
 if uploaded:
     tmp_path = os.path.join(LOG_DIR, "uploaded.jsonl")
     with open(tmp_path, "wb") as f:
