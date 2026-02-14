@@ -98,6 +98,29 @@ def predict_smile():
     except Exception as e:
         print("Error:", str(e))
         return jsonify({'error': str(e)}), 500
-
+@app.route('/manual_capture', methods=['POST'])
+def manual_capture():
+    try:
+        data = request.get_json()
+        
+        # Validate presence of image field
+        if 'image' not in data:
+            return jsonify({'error': 'No image data'}), 400
+        
+        # Decode image safely
+        _, encoded = data['image'].split(",", 1)
+        img_data = base64.b64decode(encoded)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+        
+        # Successfully received and decoded image
+        return jsonify({'ok': True})
+    
+    except Exception as e:
+        print("Error in manual_capture:", str(e))
+        return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
