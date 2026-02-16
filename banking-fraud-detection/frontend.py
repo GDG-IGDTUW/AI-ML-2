@@ -78,7 +78,6 @@ if not df.empty:
 # ------------------------------
 st.sidebar.title("⚙️ Controls")
 
-uploaded = st.sidebar.file_uploader("Upload a log file (.jsonl)", type=["jsonl"])
 if uploaded:
     tmp_path = os.path.join(LOG_DIR, "uploaded.jsonl")
     with open(tmp_path, "wb") as f:
@@ -104,8 +103,7 @@ df = load_logs(log_path)
 # ------------------------------
 # Tabs
 # ------------------------------
-tabs = st.tabs(["📊 Summary", "🕒 Timeline", "📈 Analytics", "📜 Raw Logs"])
-
+tabs = st.tabs(["📊 Summary", "🕒 Timeline", "📈 Analytics", "📊 Feature Distribution", "📜 Raw Logs"])
 
 # ------------------------------
 # Summary Tab (auto-refresh)
@@ -191,11 +189,35 @@ with tabs[2]:
     else:
         st.info("No analytics available yet.")
 
+# ------------------------------
+# Feature Distribution Tab
+# ------------------------------
+with tabs[3]:
+    st.subheader("📊 Feature Distribution")
+    
+    if not df.empty:
+        import plotly.express as px
+        
+        st.markdown("### Risk Score Distribution")
+        fig = px.histogram(df, x="risk_score", nbins=30, title="Risk Score Distribution")
+        st.plotly_chart(fig)
+        
+        st.markdown("### Box Plot - Outlier Detection")
+        fig2 = px.box(df, y="risk_score", title="Risk Score Outliers")
+        st.plotly_chart(fig2)
+        st.markdown("### Statistics")
+        st.write(df["risk_score"].describe())
+        
+        st.markdown("### Verdict Distribution")
+        fig3 = px.pie(df, names="verdict", title="Verdict Breakdown")
+        st.plotly_chart(fig3)
+    else:
+        st.info("No data to visualize.")
 
 # ------------------------------
 # Raw Logs Tab
 # ------------------------------
-with tabs[3]:
+with tabs[4]:
     st.subheader("📜 Raw Log Data")
     if not df.empty:
         st.dataframe(df)
