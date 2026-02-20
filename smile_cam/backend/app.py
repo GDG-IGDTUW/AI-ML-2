@@ -37,11 +37,19 @@ MOUTH_CORNERS_RIGHT = 291
 MOUTH_UPPER_POINTS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291]  # example subset
 MOUTH_LOWER_POINTS = [146, 91, 181, 84, 17, 314, 405, 321, 375]
 
-def is_smiling(face_landmarker_result):
+def calculate_smile_score(face_landmarker_result):
+    """
+    Calculate smile score (0-1) based on mouth corner elevation.
+    
+    Heuristic:
+    - Measures how much mouth corners are pulled up relative to mouth center
+    - Higher elevation = higher score
+    - Score clamped between 0 and 1
+    """
     if not face_landmarker_result.face_landmarks:
-        return False
+        return 0.0
 
-    landmarks = face_landmarker_result.face_landmarks[0]  # first face
+    landmarks = face_landmarker_result.face_landmarks[0]
 
     # Get coordinates (normalized 0-1)
     left_corner = landmarks[MOUTH_CORNERS_LEFT]
@@ -52,16 +60,20 @@ def is_smiling(face_landmarker_result):
     lower_y = sum(landmarks[i].y for i in MOUTH_LOWER_POINTS[:5]) / 5
     center_y = (upper_y + lower_y) / 2
 
-    # Mouth openness filter
+    # Mouth openness filter (penalize talking/yawning)
     mouth_height = lower_y - upper_y
-    if mouth_height > 0.08:  # talking/yawning
-        return False
+    if mouth_height > 0.08:
+        return 0.0
 
-    # Corners pulled up → smile
-    left_up = left_corner.y < center_y - 0.015
-    right_up = right_corner.y < center_y - 0.015
+    # Calculate corner elevation
+    left_elevation = max(0, center_y - left_corner.y)
+    right_elevation = max(0, center_y - right_corner.y)
+    avg_elevation = (left_elevation + right_elevation) / 2
 
-    return left_up and right_up
+    # Scale to 0-1 range (0.015 = threshold, 0.04 = max smile)
+    score = min(1.0, max(0.0, (avg_elevation - 0.005) / 0.035))
+    
+    return round(score, 3)
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -91,13 +103,40 @@ def predict_smile():
         # Detect
         detection_result = landmarker.detect(mp_image)
 
-        smile_detected = is_smiling(detection_result)
+        score = calculate_smile_score(detection_result)
+        smile_detected = score > 0.5
 
-        return jsonify({'smile': smile_detected})
+        return jsonify({
+            'smile': smile_detected,
+            'score': score
+        })
 
     except Exception as e:
         print("Error:", str(e))
         return jsonify({'error': str(e)}), 500
-
+@app.route('/manual_capture', methods=['POST'])
+def manual_capture():
+    try:
+        data = request.get_json()
+        
+        # Validate presence of image field
+        if 'image' not in data:
+            return jsonify({'error': 'No image data'}), 400
+        
+        # Decode image safely
+        _, encoded = data['image'].split(",", 1)
+        img_data = base64.b64decode(encoded)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({'error': 'Failed to decode image'}), 400
+        
+        # Successfully received and decoded image
+        return jsonify({'ok': True})
+    
+    except Exception as e:
+        print("Error in manual_capture:", str(e))
+        return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

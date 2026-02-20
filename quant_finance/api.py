@@ -83,6 +83,40 @@ def fetch_prices(symbol: str, outputsize: int = 90) -> PriceSeries:
     except Exception as e:
         # Network or parsing issues – surface as a clear error
         raise ValueError(f"Failed to fetch data for {symbol}: {e}")
+    
+def compute_diversification_and_correlation(
+    daily_returns: np.ndarray, symbols: List[str]
+) -> Dict:
+    """
+    Computes correlation matrix and diversification score.
+
+    Diversification score = 1 - average absolute pairwise correlation
+    """
+    returns_df = pd.DataFrame(daily_returns, columns=symbols)
+
+    corr_df = returns_df.corr()
+
+    corr_vals = corr_df.values
+    n = corr_vals.shape[0]
+
+    # EDGE CASE: single asset portfolio
+    if n < 2:
+        return {
+            "diversification_score": 0.0,
+            "correlation_matrix": corr_df.round(2).to_dict(),
+        }
+
+    # exclude diagonal (self-correlation)
+    mask = ~np.eye(n, dtype=bool)
+    avg_abs_corr = float(np.mean(np.abs(corr_vals[mask])))
+
+    diversification_score = round(1.0 - avg_abs_corr, 2)
+
+    return {
+        "diversification_score": diversification_score,
+        "correlation_matrix": corr_df.round(2).to_dict(),
+    }
+
 
 
 def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
@@ -126,6 +160,9 @@ def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
 
     # Compute daily returns per symbol
     daily_returns = price_matrix[1:] / price_matrix[:-1] - 1.0  # (T-1, N)
+    diversification = compute_diversification_and_correlation(
+        daily_returns, symbols
+    )
 
     # Portfolio daily returns as weighted sum
     port_daily_returns = daily_returns @ weights  # (T-1,)
@@ -153,13 +190,15 @@ def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
     ]
 
     return {
-        "portfolio_metrics": {
-            "expected_return": round(expected_return, 4),
-            "volatility": round(volatility, 4),
-            "sharpe_ratio": round(sharpe, 2),
-        },
-        "history": history,
-    }
+    "portfolio_metrics": {
+        "expected_return": round(expected_return, 4),
+        "volatility": round(volatility, 4),
+        "sharpe_ratio": round(sharpe, 2),
+    },
+    "diversification": diversification,
+    "history": history,
+}
+
 
 
 @app.route("/api/health", methods=["GET"])

@@ -36,8 +36,16 @@ from utils.rules import compute_rule_risk_score
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hybrid_predictor")
 
+import yaml
+
+# Load YAML config
+try:
+    with open("config.yaml", "r") as f:
+        CONFIG = yaml.safe_load(f)
+except Exception:
+    CONFIG = {"thresholds": {}}
 # ----------------- Load Profiles -----------------
-DEFAULT_PROFILE = {
+DEFAULT_PROFILE = CONFIG.get("thresholds", {
     "ae_threshold": 0.03,         # default AE MSE threshold (needs calibration)
     "hybrid_threshold": 0.5,      # score (0..1) above which becomes suspicious
     "fraud_threshold": 0.85,      # score (0..1) above which becomes fraud
@@ -46,7 +54,8 @@ DEFAULT_PROFILE = {
     "if_midpoint": 0.0,           # decision_function value at which logistic=0.5 (default 0)
     "if_steepness": 6.0,          # steepness of logistic (higher => sharper)
     # misc
-}
+    })
+
 try:
     with open("profiles/risk_profiles.json", "r", encoding="utf-8") as f:
         PROFILES = json.load(f)

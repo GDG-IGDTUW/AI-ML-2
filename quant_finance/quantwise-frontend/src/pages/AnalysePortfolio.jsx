@@ -11,6 +11,13 @@ const DEFAULT_HOLDINGS = [
   { symbol: 'TSLA', allocation: '25' },
 ];
 
+const getDiversificationLabel = (score) => {
+  if (score >= 0.6) return { text: 'High', color: 'text-emerald-300' };
+  if (score >= 0.3) return { text: 'Medium', color: 'text-amber-300' };
+  return { text: 'Low', color: 'text-rose-300' };
+};
+
+
 const PortfolioAnalyzer = () => {
   const [holdings, setHoldings] = useState(DEFAULT_HOLDINGS);
   const [analysis, setAnalysis] = useState(null);
@@ -223,7 +230,7 @@ const PortfolioAnalyzer = () => {
               </h3>
 
               {analysis ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs sm:text-sm">
                   <div className="rounded-xl bg-slate-900/80 border border-emerald-500/40 px-3 py-3 flex flex-col gap-1">
                     <span className="text-slate-400">Expected annual return</span>
                     <span className="text-emerald-300 text-lg font-semibold">
@@ -242,6 +249,19 @@ const PortfolioAnalyzer = () => {
                       {analysis.portfolio_metrics.sharpe_ratio.toFixed(2)}
                     </span>
                   </div>
+                  {analysis.diversification && (() => {
+                  const { diversification_score } = analysis.diversification;
+                  const label = getDiversificationLabel(diversification_score);
+
+                  return (
+                  <div className="rounded-xl bg-slate-900/80 border border-indigo-500/40 px-3 py-3 flex flex-col gap-1">
+                  <span className="text-slate-400">Diversification score</span>
+                  <span className={`${label.color} text-lg font-semibold`}>
+                    {diversification_score.toFixed(2)} ({label.text})
+                    </span>
+                  </div>
+                );
+          })()}
                 </div>
               ) : (
                 <p className="text-xs sm:text-sm text-slate-400">
