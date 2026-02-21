@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Download, RotateCcw, Smile, AlertCircle } from 'lucide-react';
 
 const PhotoboothApp = () => {
+  const [noFaceMessage, setNoFaceMessage] = useState('');
   const [currentPhase, setCurrentPhase] = useState('setup');
   const [capturedPhotos, setCapturedPhotos] = useState([]);
   const [message, setMessage] = useState('');
@@ -64,8 +65,14 @@ const PhotoboothApp = () => {
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      return !!data.smile;
-    } catch (err) {
+      // 👇 New: handle face_detected flag
+       if (data.face_detected === false) {
+        setNoFaceMessage('No face detected – look at the camera');
+      } else {
+        setNoFaceMessage('');
+      }
+       return !!(data.smile && data.face_detected !== false);
+    }  catch (err) {
       if (err.name !== 'AbortError') console.warn('Smile check failed:', err);
       return false;
     }
@@ -364,6 +371,11 @@ const PhotoboothApp = () => {
                 </div>
               )}
             </div>
+            {noFaceMessage && (
+              <div className="mt-3 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-sm font-medium animate-pulse">
+                {noFaceMessage}
+               </div>
+            )}
 
             <div className="flex items-center justify-center gap-3 mb-6 text-lg font-semibold text-gray-700">
               <Smile className="w-8 h-8 text-yellow-500" />

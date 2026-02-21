@@ -103,10 +103,18 @@ def predict_smile():
         # Detect
         detection_result = landmarker.detect(mp_image)
 
+        # Check if any face was detected
+        if not detection_result.face_landmarks:
+            return jsonify({
+                'face_detected': False,
+                'smile': False,
+                'score': 0.0
+            })
+        # If face is present, calculate smile score as before
         score = calculate_smile_score(detection_result)
         smile_detected = score > 0.5
-
         return jsonify({
+            'face_detected': True,
             'smile': smile_detected,
             'score': score
         })
