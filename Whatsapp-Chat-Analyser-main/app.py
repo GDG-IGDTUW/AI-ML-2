@@ -108,6 +108,37 @@ if uploaded_file is not None:
         st.title("Most common words")
         st.pyplot(fig)
 
+        # ------------------ NGRAM ANALYSIS ------------------
+
+        st.title("Most Common Phrases")
+
+        bigram_df, trigram_df = helper.fetch_ngrams(selected_user, df)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Top 20 Bigrams")
+
+            if not bigram_df.empty:
+                fig, ax = plt.subplots()
+                ax.barh(bigram_df['Bigram'], bigram_df['Count'])
+                ax.invert_yaxis()
+                st.pyplot(fig)
+            else:
+                st.info("Not enough data for bigrams")
+
+        with col2:
+            st.subheader("Top 20 Trigrams")
+
+            if not trigram_df.empty:
+                fig, ax = plt.subplots()
+                ax.barh(trigram_df['Trigram'], trigram_df['Count'])
+                ax.invert_yaxis()
+                st.pyplot(fig)
+            else:
+                st.info("Not enough data for trigrams")
+
+
         #analysing emojis
         mpl.rcParams['font.family'] = 'Segoe UI Emoji'
         emoji_df=helper.emoji_analysis(selected_user,df)

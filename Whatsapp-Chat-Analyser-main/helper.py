@@ -189,3 +189,44 @@ def reply_time_analysis(selected_user, df, gap_threshold_hours=6):
     result.rename(columns={'reply_time': 'Median Reply Time (minutes)'}, inplace=True)
 
     return result
+
+def fetch_ngrams(selected_user, df):
+
+    if selected_user != "Overall":
+        df = df[df['user'] == selected_user]
+
+    # Remove system + media messages
+    temp = df[df['user'] != "group_notification"]
+    temp = temp[temp['message'] != "<Media omitted>"]
+
+    # Load stopwords
+    with open('stop_hinglish.txt', 'r') as f:
+        stop_words = set(f.read().split())
+
+    words = []
+
+    for msg in temp['message']:
+        clean_msg = msg.lower()
+        clean_msg = clean_msg.translate(str.maketrans('', '', string.punctuation))
+
+        for word in clean_msg.split():
+            if word not in stop_words:
+                words.append(word)
+
+    # -------- BIGRAMS --------
+    bigrams = []
+    for i in range(len(words) - 1):
+        bigrams.append(words[i] + " " + words[i+1])
+
+    # -------- TRIGRAMS --------
+    trigrams = []
+    for i in range(len(words) - 2):
+        trigrams.append(words[i] + " " + words[i+1] + " " + words[i+2])
+
+    bigram_df = pd.DataFrame(Counter(bigrams).most_common(20),
+                             columns=['Bigram', 'Count'])
+
+    trigram_df = pd.DataFrame(Counter(trigrams).most_common(20),
+                              columns=['Trigram', 'Count'])
+
+    return bigram_df, trigram_df
