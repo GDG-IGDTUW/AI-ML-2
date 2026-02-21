@@ -12,6 +12,7 @@ const PhotoboothApp = () => {
   const [error, setError] = useState('');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
+  const [retakeIndex, setRetakeIndex] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -75,9 +76,14 @@ const PhotoboothApp = () => {
     setIsCapturing(true);
     setCurrentPhase('capturing');
     detectionActiveRef.current = true;
-    photoCountRef.current = 0;
     lastCaptureTimestampRef.current = 0;
-    setCapturedPhotos([]);
+
+    if (retakeIndex === null) {
+      photoCountRef.current = 0;
+      setCapturedPhotos([]);
+    } else {
+      photoCountRef.current = capturedPhotos.length;
+    }
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
 
@@ -136,7 +142,16 @@ const PhotoboothApp = () => {
         const photo = capturePhoto();
         if (photo && detectionActiveRef.current) {
           setCapturedPhotos(prev => {
-            const updated = [...prev, photo];
+            let updated;
+
+            if (retakeIndex !== null) {
+              updated = [...prev];
+              updated[retakeIndex] = photo;
+              setRetakeIndex(null);
+            } else {
+              updated = [...prev, photo];
+            }
+
             photoCountRef.current = updated.length;
 
             if (updated.length >= 3) {
@@ -145,6 +160,7 @@ const PhotoboothApp = () => {
               detectionActiveRef.current = false;
               stopWebcam();
             }
+
             return updated;
           });
         }
@@ -152,6 +168,19 @@ const PhotoboothApp = () => {
         setIsCountingDown(false);
       }
     }, 1000);
+  };
+
+  // ── Retake Single Photo ────────────────────────────────────────
+  const handleRetakeSingle = (index) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to retake this photo?"
+    );
+    if (!confirmDelete) return;
+
+    setRetakeIndex(index);
+    setCurrentPhase('capturing');
+    startWebcam();
+    setTimeout(startSmileDetection, 800);
   };
 
   // ── Camera Helpers ─────────────────────────────────────────────
@@ -393,8 +422,18 @@ const PhotoboothApp = () => {
             <h2 className="text-2xl font-bold mb-6 text-gray-800">Your Photos!</h2>
             <div className="grid grid-cols-3 gap-4 mb-8">
               {capturedPhotos.map((photo, i) => (
-                <div key={i} className="rounded-lg overflow-hidden shadow-md">
-                  <img src={photo} alt={`Photo ${i+1}`} className="w-full aspect-square object-cover" />
+                <div key={i} className="relative rounded-lg shadow-md">
+                  <img
+                    src={photo}
+                    alt={`Photo ${i+1}`}
+                    className="w-full aspect-square object-cover"
+                  />
+                  <button
+                    onClick={() => handleRetakeSingle(i)}
+                    className="absolute top-2 right-2 z-50 bg-red-600 text-white text-xl font-bold w-10 h-10 flex items-center justify-center rounded-full border-2 border-white shadow-lg"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
