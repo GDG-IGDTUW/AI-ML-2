@@ -1,6 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Download, RotateCcw, Smile, AlertCircle } from 'lucide-react';
 
+const FILTERS = [
+  { id: 'none',      label: 'None',      css: 'none' },
+  { id: 'grayscale', label: 'Grayscale', css: 'grayscale(100%)' },
+  { id: 'sepia',     label: 'Sepia',     css: 'sepia(80%)' },
+  { id: 'blur',      label: 'Blur',      css: 'blur(4px)' },
+  { id: 'vivid',     label: 'Vivid',     css: 'saturate(2) contrast(1.1)' },
+];
+
 const PhotoboothApp = () => {
   const [currentPhase, setCurrentPhase] = useState('setup');
   const [capturedPhotos, setCapturedPhotos] = useState([]);
@@ -13,6 +21,7 @@ const PhotoboothApp = () => {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [retakeIndex, setRetakeIndex] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('none');
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -23,6 +32,7 @@ const PhotoboothApp = () => {
   const countdownIntervalRef = useRef(null);
   const lastCaptureTimestampRef = useRef(0);
   const abortControllerRef = useRef(null);
+  const activeFilterRef = useRef('none');
 
   const DETECTION_INTERVAL = 900;
   const MIN_TIME_BETWEEN_CAPTURES = 4800;
@@ -139,7 +149,7 @@ const PhotoboothApp = () => {
         clearInterval(countdownIntervalRef.current);
         setCountdown(null);
 
-        const photo = capturePhoto();
+        const photo = captureFilteredPhoto();
         if (photo && detectionActiveRef.current) {
           setCapturedPhotos(prev => {
             let updated;
@@ -214,6 +224,20 @@ const PhotoboothApp = () => {
     return canvas.toDataURL('image/jpeg', 0.82);
   };
 
+  // Captures with active filter applied — used for stored photos only.
+  // capturePhoto() stays raw so backend smile detection is unaffected.
+  const captureFilteredPhoto = () => {
+    if (!videoRef.current?.videoWidth || !canvasRef.current) return null;
+    const canvas = canvasRef.current;
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.filter = FILTERS.find(f => f.id === activeFilterRef.current)?.css || 'none';
+    ctx.drawImage(videoRef.current, 0, 0);
+    ctx.filter = 'none';
+    return canvas.toDataURL('image/jpeg', 0.82);
+  };
+
   // ── Generate Final Strip ───────────────────────────────────────
   const generatePhotoStrip = () => {
     if (!stripCanvasRef.current || capturedPhotos.length !== 3) return;
@@ -282,6 +306,8 @@ const PhotoboothApp = () => {
     setCountdown(null);
     setCurrentPhase('setup');
     setError('');
+    setActiveFilter('none');
+    activeFilterRef.current = 'none';
     stopWebcam();
   };
 
@@ -355,7 +381,13 @@ const PhotoboothApp = () => {
                 muted
                 playsInline
                 className="w-full max-w-md mx-auto"
+                style={{ filter: FILTERS.find(f => f.id === activeFilter)?.css }}
               />
+              {activeFilter !== 'none' && (
+                <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded-full font-medium pointer-events-none">
+                  {FILTERS.find(f => f.id === activeFilter)?.label}
+                </div>
+              )}
               {countdown !== null && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <div className="text-white text-9xl font-black animate-pulse drop-shadow-2xl">
@@ -380,6 +412,22 @@ const PhotoboothApp = () => {
                       : 'bg-gray-200'
                   }`}
                 />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center gap-2 mb-6 flex-wrap">
+              {FILTERS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => { setActiveFilter(f.id); activeFilterRef.current = f.id; }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    activeFilter === f.id
+                      ? 'bg-indigo-600 text-white shadow-md scale-105'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
               ))}
             </div>
 
