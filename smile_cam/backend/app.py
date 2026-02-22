@@ -3,6 +3,7 @@ from flask_cors import CORS
 import cv2
 import numpy as np
 import base64
+import os
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -16,7 +17,9 @@ FaceLandmarker = vision.FaceLandmarker
 FaceLandmarkerOptions = vision.FaceLandmarkerOptions
 VisionRunningMode = vision.RunningMode
 
-model_path = "face_landmarker.task"  # ← change if using different model file
+# Build path relative to this file so the model loads correctly regardless of
+# which directory the app is launched from (e.g. `python backend/app.py`).
+model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_landmarker.task")
 
 options = FaceLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
