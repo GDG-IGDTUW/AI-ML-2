@@ -1,195 +1,195 @@
 import streamlit as st
-import preprocessor,helper
+import preprocessor, helper
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
 st.sidebar.title("Whatsapp Chat Analyser")
-uploaded_file = st.sidebar.file_uploader("Choose a file")
-if uploaded_file is not None:
-    bytes_data = uploaded_file.getvalue()
-    data=bytes_data.decode("utf-8")
-    df=preprocessor.preprocessor(data)
 
-    # fetch unique users
-    user_list = df['user'].unique().tolist()
-    try:
-         user_list.remove('group_notification')
-    except ValueError:
-        pass
-    user_list.sort()
-    user_list.insert(0,"Overall")
-    selected_user=st.sidebar.selectbox("Show analysis wrt", user_list)
+uploaded_files = st.sidebar.file_uploader(
+    "Choose 1–3 WhatsApp chat files",
+    accept_multiple_files=True
+)
 
-    if st.sidebar.button("Show Analysis"):
-        st.title("Top Statistics")
-        num_messages, words , num_media , num_links=helper.fetch_stats(selected_user,df)
-        col1, col2, col3, col4=st.columns(4)
-        with col1:
-            st.header("Total Messages")
-            st.title(num_messages)
-        with col2:
-            st.header("Total Words")
-            st.title(words)
-        with col3:
-            st.header("Media Shared")
-            st.title(num_media)
-        with col4:
-            st.header("Links Shared")
-            st.title(num_links)
+if uploaded_files:
 
-        #Monthly timeline
-        st.title("Monthly Timeline")
-        timeline_df=helper.timeline(selected_user,df)
-        fig,ax=plt.subplots()
-        ax.plot(timeline_df['time'], timeline_df['message'], color="purple")
-        plt.xticks(rotation=45)
-        st.pyplot(fig)
+    chat_dataframes = {}
 
-        #daily Timeline
-        st.title("Daily Timeline")
-        daily_timeline=helper.daily_timeline(selected_user,df)
-        fig, ax = plt.subplots()
-        ax.plot(daily_timeline['date_only'], daily_timeline['message'])
-        plt.xticks(rotation=45)
-        st.pyplot(fig)
+    for file in uploaded_files:
+        data = file.read().decode("utf-8")
+        df = preprocessor.preprocessor(data)
+        chat_dataframes[file.name] = df
 
-        #activity map
-        st.title("Activity Map")
-        col1,col2=st.columns(2)
-        with col1:
-            st.header("Most Busy Day")
-            busy_day=helper.week_activity_map(selected_user,df)
-            fig,ax=plt.subplots()
-            ax.bar(busy_day.index,busy_day.values)
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
-        with col2:
-            st.header("Most Busy Month")
-            busy_month = helper.month_activity_map(selected_user, df)
-            fig, ax = plt.subplots()
-            ax.bar(busy_month.index, busy_month.values,color='orange')
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+    # ==========================================================
+    # 🔥 MULTI CHAT MODE (2–3 FILES) → SIDE-BY-SIDE COMPARISON
+    # ==========================================================
 
-        # weekly activity heatmap
-        st.title("Activity HeatMap")
-        user_heatmap=helper.activity_heatmap(selected_user,df)
-        fig,ax=plt.subplots()
-        ax=sns.heatmap(user_heatmap)
-        st.pyplot(fig)
+    if len(uploaded_files) > 1:
 
-        #finding the busiest users in the the group
-        if selected_user=="Overall":
-            st.title("Most Busy Users")
-            x, new_df=helper.fetch_most_busy_users(df)
-            fig, ax=plt.subplots()
+        if st.sidebar.button("Compare Chats"):
 
-            col1 , col2 =st.columns(2)
+            st.title("Side-by-Side Chat Comparison")
+
+            cols = st.columns(len(chat_dataframes))
+
+            for col, (chat_name, df) in zip(cols, chat_dataframes.items()):
+
+                with col:
+                    st.subheader(chat_name)
+
+                    num_messages, words, media, links = helper.fetch_stats("Overall", df)
+
+                    st.write("Messages:", num_messages)
+                    st.write("Words:", words)
+                    st.write("Media:", media)
+                    st.write("Links:", links)
+
+    # ==========================================================
+    # 🔥 SINGLE CHAT MODE → FULL DETAILED ANALYSIS
+    # ==========================================================
+
+    elif len(uploaded_files) == 1:
+
+        df = list(chat_dataframes.values())[0]
+
+        # fetch unique users
+        user_list = df['user'].unique().tolist()
+        try:
+            user_list.remove('group_notification')
+        except ValueError:
+            pass
+
+        user_list.sort()
+        user_list.insert(0, "Overall")
+
+        selected_user = st.sidebar.selectbox("Show analysis wrt", user_list)
+
+        if st.sidebar.button("Show Detailed Analysis"):
+
+            # ---------------- TOP STATS ----------------
+            st.title("Top Statistics")
+
+            num_messages, words, num_media, num_links = helper.fetch_stats(selected_user, df)
+
+            col1, col2, col3, col4 = st.columns(4)
+
             with col1:
-                ax.bar(x.index, x.values)
+                st.header("Total Messages")
+                st.title(num_messages)
+
+            with col2:
+                st.header("Total Words")
+                st.title(words)
+
+            with col3:
+                st.header("Media Shared")
+                st.title(num_media)
+
+            with col4:
+                st.header("Links Shared")
+                st.title(num_links)
+
+            # ---------------- MONTHLY TIMELINE ----------------
+            st.title("Monthly Timeline")
+            timeline_df = helper.timeline(selected_user, df)
+            fig, ax = plt.subplots()
+            ax.plot(timeline_df['time'], timeline_df['message'], color="purple")
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
+
+            # ---------------- DAILY TIMELINE ----------------
+            st.title("Daily Timeline")
+            daily_timeline = helper.daily_timeline(selected_user, df)
+            fig, ax = plt.subplots()
+            ax.plot(daily_timeline['date_only'], daily_timeline['message'])
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
+
+            # ---------------- ACTIVITY MAP ----------------
+            st.title("Activity Map")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.header("Most Busy Day")
+                busy_day = helper.week_activity_map(selected_user, df)
+                fig, ax = plt.subplots()
+                ax.bar(busy_day.index, busy_day.values)
                 plt.xticks(rotation=45)
                 st.pyplot(fig)
+
             with col2:
-                st.dataframe(new_df)
-
-        #wordcloud
-        st.title("Word Cloud")
-        df_wc=helper.create_wordcloud(selected_user,df)
-        fig, ax=plt.subplots()
-        ax.imshow(df_wc)
-        st.pyplot(fig)
-
-        # most common words
-        most_common_df=helper.most_common_words(selected_user,df)
-        fig, ax= plt.subplots()
-        ax.barh(most_common_df[0],most_common_df[1])
-        plt.xticks(rotation='vertical')
-        st.title("Most common words")
-        st.pyplot(fig)
-
-        # ------------------ NGRAM ANALYSIS ------------------
-
-        st.title("Most Common Phrases")
-
-        bigram_df, trigram_df = helper.fetch_ngrams(selected_user, df)
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("Top 20 Bigrams")
-
-            if not bigram_df.empty:
+                st.header("Most Busy Month")
+                busy_month = helper.month_activity_map(selected_user, df)
                 fig, ax = plt.subplots()
-                ax.barh(bigram_df['Bigram'], bigram_df['Count'])
-                ax.invert_yaxis()
+                ax.bar(busy_month.index, busy_month.values, color='orange')
+                plt.xticks(rotation=45)
                 st.pyplot(fig)
+
+            # ---------------- HEATMAP ----------------
+            st.title("Activity HeatMap")
+            user_heatmap = helper.activity_heatmap(selected_user, df)
+
+            if user_heatmap.empty:
+                st.warning("Not enough data to generate heatmap for this selection.")
             else:
-                st.info("Not enough data for bigrams")
-
-        with col2:
-            st.subheader("Top 20 Trigrams")
-
-            if not trigram_df.empty:
                 fig, ax = plt.subplots()
-                ax.barh(trigram_df['Trigram'], trigram_df['Count'])
-                ax.invert_yaxis()
+                sns.heatmap(user_heatmap, ax=ax)
                 st.pyplot(fig)
-            else:
-                st.info("Not enough data for trigrams")
 
+            # ---------------- BUSIEST USERS ----------------
+            if selected_user == "Overall":
+                st.title("Most Busy Users")
+                x, new_df = helper.fetch_most_busy_users(df)
+                col1, col2 = st.columns(2)
 
-        #analysing emojis
-        mpl.rcParams['font.family'] = 'Segoe UI Emoji'
-        emoji_df=helper.emoji_analysis(selected_user,df)
-        st.title("Emoji Analysis")
-        col1 , col2= st.columns(2)
-        with col1:
-            st.dataframe(emoji_df)
-        with col2:
-            fig, ax=plt.subplots()
-            top_emoji=emoji_df.head(10)
-            ax.pie(top_emoji[1], labels=top_emoji[0], autopct="%0.2f")
-            st.pyplot(fig)
+                with col1:
+                    fig, ax = plt.subplots()
+                    ax.bar(x.index, x.values)
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
 
-        # Toxic / Profanity Analysis
-        st.title("Toxic words / Profanity Analysis")
-        toxic_user_df, toxic_words_df = helper.toxic_analysis(selected_user, df)
+                with col2:
+                    st.dataframe(new_df)
 
-        st.caption(
-        "⚠️ Disclaimer: This analysis is keyword-based using a small custom list. "
-         "It does not understand context and may produce false positives."
-        )
-
-        st.subheader("Toxic Word Count per User")
-        st.dataframe(toxic_user_df)
-
-        st.subheader("Most Common Flagged Words")
-        st.dataframe(toxic_words_df)
-
-        # Response time Analysis
-        st.title("Response Time Analysis (Who Replies Faster)")
-
-        gap_threshold = st.slider(
-            "Exclude gaps longer than (hours)",
-            min_value=1,
-            max_value=24,
-            value=6
-        )
-
-        reply_df = helper.reply_time_analysis(selected_user, df, gap_threshold)
-
-        st.subheader("Median Reply Time per User (in minutes)")
-        st.dataframe(reply_df)
-
-        # Optional Bar Chart
-        if not reply_df.empty:
+            # ---------------- WORD CLOUD ----------------
+            st.title("Word Cloud")
+            df_wc = helper.create_wordcloud(selected_user, df)
             fig, ax = plt.subplots()
-            ax.bar(
-                reply_df['user'],
-                reply_df['Median Reply Time (minutes)']
-            )
-            plt.xticks(rotation=45)
-            ax.set_ylabel("Minutes")
-            ax.set_title("Median Reply Time")
+            ax.imshow(df_wc)
+            ax.axis("off")
             st.pyplot(fig)
+
+            # ---------------- MOST COMMON WORDS ----------------
+            # ---------------- MOST COMMON WORDS ----------------
+            st.title("Most Common Words")
+            most_common_df = helper.most_common_words(selected_user, df)
+
+            if most_common_df.empty:
+                st.warning("Not enough data to display most common words.")
+            else:
+                fig, ax = plt.subplots()
+                ax.barh(
+                    most_common_df.iloc[:, 0],
+                    most_common_df.iloc[:, 1]
+                )
+                ax.invert_yaxis()
+                st.pyplot(fig)
+
+            # ---------------- EMOJI ANALYSIS ----------------
+            mpl.rcParams['font.family'] = 'Segoe UI Emoji'
+
+            st.title("Emoji Analysis")
+            emoji_df = helper.emoji_analysis(selected_user, df)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.dataframe(emoji_df)
+
+            with col2:
+                if not emoji_df.empty:
+                    fig, ax = plt.subplots()
+                    top_emoji = emoji_df.head(10)
+                    ax.pie(top_emoji[1], labels=top_emoji[0], autopct="%0.2f")
+                    st.pyplot(fig)
