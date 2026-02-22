@@ -43,8 +43,13 @@ def create_wordcloud(selected_user,df):
                 y.append(word)
         return " ".join(y)
     #creating image
-    temp['message'] = temp['message'].apply(remove_stop_words)
-    df_wc=wc.generate(temp['message'].str.cat(sep=" "))
+    temp['message'] = temp['message'].fillna("").astype(str).apply(remove_stop_words)
+
+    # If no valid messages remain, return empty wordcloud safely
+    if temp['message'].str.strip().eq("").all():
+        return wc.generate("No Data")
+
+    df_wc = wc.generate(temp['message'].str.cat(sep=" "))
 
     return df_wc
 
