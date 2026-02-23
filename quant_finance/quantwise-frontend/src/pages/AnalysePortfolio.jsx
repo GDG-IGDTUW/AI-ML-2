@@ -16,7 +16,20 @@ const getDiversificationLabel = (score) => {
   if (score >= 0.3) return { text: 'Medium', color: 'text-amber-300' };
   return { text: 'Low', color: 'text-rose-300' };
 };
+const getDrawdownLabel = (drawdown) => {
+  // drawdown is negative, e.g., -0.15
+  const absDrawdown = Math.abs(drawdown);
+  if (absDrawdown < 0.10) return { text: 'Low', color: 'text-emerald-300' };
+  if (absDrawdown < 0.20) return { text: 'Medium', color: 'text-amber-300' };
+  return { text: 'High', color: 'text-rose-300' };
+};
 
+const getVarLabel = (varValue) => {
+  // varValue is positive loss percentage, e.g., 0.05 for 5%
+  if (varValue < 0.05) return { text: 'Low', color: 'text-emerald-300' };
+  if (varValue < 0.10) return { text: 'Medium', color: 'text-amber-300' };
+  return { text: 'High', color: 'text-rose-300' };
+};
 
 const PortfolioAnalyzer = () => {
   const [holdings, setHoldings] = useState(DEFAULT_HOLDINGS);
@@ -230,38 +243,100 @@ const PortfolioAnalyzer = () => {
               </h3>
 
               {analysis ? (
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs sm:text-sm">
-                  <div className="rounded-xl bg-slate-900/80 border border-emerald-500/40 px-3 py-3 flex flex-col gap-1">
-                    <span className="text-slate-400">Expected annual return</span>
-                    <span className="text-emerald-300 text-lg font-semibold">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm sm:text-base">
+                  {/* Expected annual return */}
+                  <div className="rounded-xl bg-slate-900/80 border border-emerald-500/40 px-5 py-5 flex flex-col gap-2">
+                    <span className="text-slate-400 text-xs sm:text-sm">Expected annual return</span>
+                    <span className="text-emerald-300 text-2xl sm:text-3xl font-semibold">
                       {(analysis.portfolio_metrics.expected_return * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <div className="rounded-xl bg-slate-900/80 border border-amber-500/40 px-3 py-3 flex flex-col gap-1">
-                    <span className="text-slate-400">Volatility (risk)</span>
-                    <span className="text-amber-300 text-lg font-semibold">
+
+                  {/* Volatility */}
+                  <div className="rounded-xl bg-slate-900/80 border border-amber-500/40 px-5 py-5 flex flex-col gap-2">
+                    <span className="text-slate-400 text-xs sm:text-sm">Volatility (risk)</span>
+                    <span className="text-amber-300 text-2xl sm:text-3xl font-semibold">
                       {(analysis.portfolio_metrics.volatility * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <div className="rounded-xl bg-slate-900/80 border border-sky-500/40 px-3 py-3 flex flex-col gap-1">
-                    <span className="text-slate-400">Sharpe ratio</span>
-                    <span className="text-sky-300 text-lg font-semibold">
+
+                  {/* Sharpe ratio */}
+                  <div className="rounded-xl bg-slate-900/80 border border-sky-500/40 px-5 py-5 flex flex-col gap-2">
+                    <span className="text-slate-400 text-xs sm:text-sm">Sharpe ratio</span>
+                    <span className="text-sky-300 text-2xl sm:text-3xl font-semibold">
                       {analysis.portfolio_metrics.sharpe_ratio.toFixed(2)}
                     </span>
                   </div>
-                  {analysis.diversification && (() => {
-                  const { diversification_score } = analysis.diversification;
-                  const label = getDiversificationLabel(diversification_score);
 
-                  return (
-                  <div className="rounded-xl bg-slate-900/80 border border-indigo-500/40 px-3 py-3 flex flex-col gap-1">
-                  <span className="text-slate-400">Diversification score</span>
-                  <span className={`${label.color} text-lg font-semibold`}>
-                    {diversification_score.toFixed(2)} ({label.text})
-                    </span>
-                  </div>
-                );
-          })()}
+                  {/* Max Drawdown */}
+                  {analysis.portfolio_metrics.max_drawdown !== undefined && (() => {
+                    const ddLabel = getDrawdownLabel(analysis.portfolio_metrics.max_drawdown);
+                    const colorMap = {
+                      Low: 'text-emerald-300',
+                      Medium: 'text-amber-300',
+                      High: 'text-rose-300'
+                    };
+                    return (
+                      <div className="rounded-xl bg-slate-900/80 border border-purple-500/40 px-5 py-5 flex flex-col gap-2">
+                        <span className="text-slate-400 text-xs sm:text-sm">Max Drawdown</span>
+                        <div className="flex items-baseline flex-wrap gap-2">
+                          <span className={`${colorMap[ddLabel.text]} text-2xl sm:text-3xl font-semibold`}>
+                            {(Math.abs(analysis.portfolio_metrics.max_drawdown) * 100).toFixed(1)}%
+                          </span>
+                          <span className={`${colorMap[ddLabel.text]} text-sm sm:text-base font-medium px-2 py-1 rounded-full bg-slate-800/60`}>
+                            {ddLabel.text}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* VaR (95%) */}
+                  {analysis.portfolio_metrics.var_95 !== undefined && (() => {
+                    const varLabel = getVarLabel(analysis.portfolio_metrics.var_95);
+                    const colorMap = {
+                      Low: 'text-emerald-300',
+                      Medium: 'text-amber-300',
+                      High: 'text-rose-300'
+                    };
+                    return (
+                      <div className="rounded-xl bg-slate-900/80 border border-pink-500/40 px-5 py-5 flex flex-col gap-2">
+                        <span className="text-slate-400 text-xs sm:text-sm">VaR (95%)</span>
+                        <div className="flex items-baseline flex-wrap gap-2">
+                          <span className={`${colorMap[varLabel.text]} text-2xl sm:text-3xl font-semibold`}>
+                            {(analysis.portfolio_metrics.var_95 * 100).toFixed(1)}%
+                          </span>
+                          <span className={`${colorMap[varLabel.text]} text-sm sm:text-base font-medium px-2 py-1 rounded-full bg-slate-800/60`}>
+                            {varLabel.text}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Diversification score */}
+                  {analysis.diversification && (() => {
+                    const { diversification_score } = analysis.diversification;
+                    const label = getDiversificationLabel(diversification_score);
+                    const colorMap = {
+                      Low: 'text-emerald-300',
+                      Medium: 'text-amber-300',
+                      High: 'text-rose-300'
+                    };
+                    return (
+                      <div className="rounded-xl bg-slate-900/80 border border-indigo-500/40 px-5 py-5 flex flex-col gap-2">
+                        <span className="text-slate-400 text-xs sm:text-sm">Diversification score</span>
+                        <div className="flex items-baseline flex-wrap gap-2">
+                          <span className={`${colorMap[label.text]} text-2xl sm:text-3xl font-semibold`}>
+                            {diversification_score.toFixed(2)}
+                          </span>
+                          <span className={`${colorMap[label.text]} text-sm sm:text-base font-medium px-2 py-1 rounded-full bg-slate-800/60`}>
+                            {label.text}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <p className="text-xs sm:text-sm text-slate-400">
