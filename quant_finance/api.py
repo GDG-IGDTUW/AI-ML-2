@@ -117,7 +117,24 @@ def compute_diversification_and_correlation(
         "correlation_matrix": corr_df.round(2).to_dict(),
     }
 
+def compute_max_drawdown(port_daily_returns: np.ndarray) -> float:
+    """Compute maximum drawdown from a series of daily returns."""
+    cumulative = np.cumprod(1 + port_daily_returns)
+    running_max = np.maximum.accumulate(cumulative)
+    drawdown = (cumulative - running_max) / running_max
+    max_dd = np.min(drawdown)          # most negative value
+    return float(max_dd)               # e.g. -0.25 for 25% drawdown
 
+
+def compute_var(port_daily_returns: np.ndarray, confidence: float = 0.95) -> float:
+    """
+    Compute Value at Risk (VaR) at a given confidence level using the historical method.
+    Returns a positive number representing the potential loss (e.g., 0.05 for 5% loss).
+    """
+    sorted_returns = np.sort(port_daily_returns)
+    index = int((1 - confidence) * len(sorted_returns))
+    var = -sorted_returns[index]       # VaR as a positive loss percentage
+    return float(var)
 
 def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
     """
@@ -166,6 +183,9 @@ def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
 
     # Portfolio daily returns as weighted sum
     port_daily_returns = daily_returns @ weights  # (T-1,)
+    
+    max_drawdown = compute_max_drawdown(port_daily_returns)
+    var_95 = compute_var(port_daily_returns, confidence=0.95)
 
     # Annualised metrics (assuming 252 trading days)
     mean_daily = float(np.mean(port_daily_returns))
@@ -188,16 +208,19 @@ def compute_metrics(portfolio: List[Dict[str, float]]) -> Dict:
         }
         for d, v in zip(value_dates, port_values)
     ]
-
     return {
     "portfolio_metrics": {
         "expected_return": round(expected_return, 4),
         "volatility": round(volatility, 4),
         "sharpe_ratio": round(sharpe, 2),
+        "max_drawdown": round(max_drawdown, 4),   # <-- new
+        "var_95": round(var_95, 4)                # <-- new
     },
     "diversification": diversification,
     "history": history,
 }
+    
+
 
 
 
